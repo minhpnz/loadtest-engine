@@ -9,4 +9,5 @@ artifacts/
 # Keep publication source-only.
 .github/
 *.[mM][dD]
+!AI-USAGE.md
 *.markdown
