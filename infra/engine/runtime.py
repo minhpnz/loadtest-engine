@@ -67,12 +67,13 @@ class Kube:
     def get(self, resource, name=None, namespace=None, labels=None):
         args = ['get', resource]
         if name:
-            args.append(name)
+            # Only for named reads: on a list, kubectl prints nothing instead of empty items.
+            args += [name, '--ignore-not-found']
         if namespace:
             args += ['-n', namespace]
         if labels:
             args += ['-l', labels]
-        args += ['--ignore-not-found', '-o', 'json']
+        args += ['-o', 'json']
         text = self.call(*args)
         return json.loads(text) if text.strip() else None
 
