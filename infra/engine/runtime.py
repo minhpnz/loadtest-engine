@@ -189,6 +189,14 @@ def prepare(service_name, ref, image, local=False):
         raise Rejected('authenticated user does not own this service')
     source, handle = fetch_service(service, ref, local)
     try:
+        # A service living in a subdirectory of its repository (monorepo); local mode already
+        # starts from local_path, so config_path stays relative to the service either way.
+        subdirectory = Path(service.get('repository_path', '.'))
+        if not local and subdirectory != Path('.'):
+            root = source.resolve()
+            if subdirectory.is_absolute() or '..' in subdirectory.parts or not (root / subdirectory).resolve().is_relative_to(root):
+                raise Rejected('repository_path must stay inside the service repository')
+            source = root / subdirectory
         config = read_yaml(bounded_path(source, service['config_path']))
         plan = validate(config, service_name, service, policy, source, image or service['local_image'], local)
     finally:

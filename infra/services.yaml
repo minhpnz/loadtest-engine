@@ -1,10 +1,11 @@
-# Platform-owned catalog. Replace repository/project/image values before a cloud run.
+# Platform-owned catalog: who may test which service, from which repository and image repository.
 services:
   payment-service:
     team: payments-team
-    owner_ids: ["12345"]
-    repository: https://github.com/your-company/payment-service.git
-    image_repository: 123456789012.dkr.ecr.ap-southeast-1.amazonaws.com/payment-service
+    owner_ids: ["51442765"]  # numeric GitHub user IDs (gh api user --jq .id)
+    repository: https://github.com/minhpnz/loadtest-engine.git
+    repository_path: developer/examples/payment-service  # service subdirectory inside the repository
+    image_repository: ghcr.io/minhpnz/loadtest-demo/service
     local_path: developer/examples/payment-service
     local_image: loadtest/payment-service:local
     profile: small

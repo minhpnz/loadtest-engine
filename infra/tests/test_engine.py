@@ -220,6 +220,27 @@ class GitHubIdentityTests(unittest.TestCase):
                     actor(False, self.settings)
                 request.assert_not_called()
 
+    def test_repository_path_reads_config_from_service_subdirectory(self):
+        service = {**read_yaml(ROOT / 'infra/services.yaml')['services']['payment-service'],
+                   'owner_ids': ['200']}
+        catalog = {'services': {'payment-service': service}}
+        image = service['image_repository'] + '@sha256:' + 'b' * 64
+        with tempfile.TemporaryDirectory() as checkout, \
+                patch('infra.engine.runtime.read_yaml', side_effect=lambda path: catalog if Path(path).name == 'services.yaml' else read_yaml(path)), \
+                patch('infra.engine.runtime.actor', return_value='200'), \
+                patch('infra.engine.runtime.fetch_service', return_value=(Path(checkout), None)):
+            config = Path(checkout, 'svc', 'load-tests')
+            config.mkdir(parents=True)
+            (config / 'load-test-config.yaml').write_text((ROOT / service['local_path'] / service['config_path']).read_text())
+            for path, ok in [('svc', True), ('../svc', False), ('/svc', False)]:
+                service['repository_path'] = path
+                with self.subTest(path=path):
+                    if ok:
+                        self.assertEqual(prepare('payment-service', 'a' * 40, image)[0]['service'], 'payment-service')
+                    else:
+                        with self.assertRaises(Rejected):
+                            prepare('payment-service', 'a' * 40, image)
+
     def test_unapproved_repository_url_is_denied_before_git(self):
         for url in ('https://github.com.evil.test/acme/service.git', 'https://user@github.com/acme/service.git',
                     'https://github.com/acme/service.git?token=secret', 'http://github.com/acme/service.git'):

@@ -1,9 +1,9 @@
 # Protected platform settings. URLs and identities are not accepted as pipeline inputs.
-github_repository: your-company/loadtest-engine
+github_repository: minhpnz/loadtest-engine
 github_branch: main
-aws_role_arn: arn:aws:iam::123456789012:role/loadtest-github-executor
+aws_role_arn: arn:aws:iam::403322447180:role/loadtest-github-executor
 cluster_name: loadtest-nonprod-apse1
 aws_region: ap-southeast-1
 prometheus_url: http://prometheus-operated.monitoring.svc.cluster.local:9090
 guard_url: http://guard.loadtest-system.svc.cluster.local:8080
-results_bucket: replace-with-your-private-results-bucket
+results_bucket: loadtest-results-403322447180-apse1-demo
