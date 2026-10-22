@@ -71,6 +71,6 @@ These numbers are a **regression signal under a fixed load shape, not a capacity
 | 1 | Remote Terraform state, plan on PR, apply on approval | No apply runs from a laptop; state is in S3 with locking |
 | 2 | Per-team execution slots, runner Deployment scaled to match | Two teams run in parallel without queuing behind each other |
 | 3 | Sign each image at build time (GitHub build attestation) and make the engine verify it, so a test only runs on an image provably built from this repository and commit | An image without a valid signature for the requested commit is rejected before deployment |
-| 4 | Self-registering runner: a GitHub App key in Secrets Manager (synced by External Secrets) lets the runner pod mint its own registration token at start-up; set the fork-approval policy to all outside collaborators in code | Deleting the runner pod brings it back online with no manual step; a fork PR targeting `loadtest-eks` waits for approval |
+| 4 | Self-registering runner: a GitHub App key in Secrets Manager (synced by External Secrets) lets the runner pod mint its own registration token at start-up; set the fork-approval policy to all outside collaborators in code | Deleting the runner pod brings it back online with no manual step |
 
 After that: move add-ons and policies to Argo CD through a GitOps bridge, add per-run stubs and seeded databases, add authenticated scenarios, and compare each run against the service's previous baseline.
