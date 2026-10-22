@@ -3,19 +3,29 @@ kind: Namespace
 metadata:
   name: loadtest-ci
 ---
-apiVersion: batch/v1
-kind: Job
+# One long-lived self-hosted runner. The cluster exists only for load testing and is destroyed as a
+# whole at decommission, so a persistent runner replaces per-run ephemeral registration. Jobs still
+# run one at a time (single replica + workflow concurrency); actions/checkout cleans the workspace
+# and each job gets fresh OIDC credentials, so nothing secret carries over between jobs.
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: github-runner
   namespace: loadtest-ci
 spec:
-  backoffLimit: 0
-  activeDeadlineSeconds: 7200
-  ttlSecondsAfterFinished: 600
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: github-runner
   template:
+    metadata:
+      labels:
+        app: github-runner
     spec:
       automountServiceAccountToken: false
-      restartPolicy: Never
+      terminationGracePeriodSeconds: 30
       nodeSelector:
         role: system
       securityContext:
@@ -30,9 +40,10 @@ spec:
           command: [/bin/bash, -euc]
           args:
             - |
+              # --replace keeps one registration under a fixed name across pod restarts.
               ./config.sh --url "$GITHUB_REPOSITORY_URL" --token "$RUNNER_REGISTRATION_TOKEN" \
-                --name "loadtest-${HOSTNAME}" --labels loadtest-eks --work _work \
-                --unattended --ephemeral --disableupdate
+                --name loadtest-eks-runner --labels loadtest-eks --work _work \
+                --unattended --replace --disableupdate
               unset RUNNER_REGISTRATION_TOKEN
               exec ./run.sh
           env:
