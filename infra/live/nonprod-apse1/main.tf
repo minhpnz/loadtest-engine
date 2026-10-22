@@ -32,6 +32,8 @@ module "github_role" {
   repository                 = var.github_repository
   branch                     = var.github_branch
   environment                = var.github_environment
+  owner_id                   = var.github_owner_id
+  repository_id              = var.github_repository_id
   cluster_arn                = "arn:aws:eks:${var.region}:${data.aws_caller_identity.current.account_id}:cluster/${local.name}"
   results_bucket_arn         = module.results.bucket_arn
   existing_oidc_provider_arn = var.existing_github_oidc_provider_arn

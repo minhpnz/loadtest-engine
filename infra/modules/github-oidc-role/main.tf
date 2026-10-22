@@ -9,6 +9,16 @@ variable "repository" { type = string }
 variable "branch" { type = string }
 variable "cluster_arn" { type = string }
 variable "results_bucket_arn" { type = string }
+variable "owner_id" {
+  description = "Numeric GitHub owner ID. With repository_id, trust GitHub's immutable subject (owner@id/repo@id), which a renamed or re-created repository cannot match."
+  type        = number
+  default     = null
+}
+variable "repository_id" {
+  description = "Numeric GitHub repository ID; see owner_id."
+  type        = number
+  default     = null
+}
 variable "environment" {
   description = "GitHub environment whose jobs may also assume the role (approval-gated pipeline). Null trusts the branch only."
   type        = string
@@ -22,8 +32,11 @@ variable "existing_oidc_provider_arn" {
 locals {
   issuer = "token.actions.githubusercontent.com"
   # A job bound to an environment receives an environment subject instead of the branch subject.
-  subjects = concat(["repo:${var.repository}:ref:refs/heads/${var.branch}"],
-  var.environment == null ? [] : ["repo:${var.repository}:environment:${var.environment}"])
+  prefix = var.owner_id == null || var.repository_id == null ? "repo:${var.repository}" : format(
+    "repo:%s@%d/%s@%d", split("/", var.repository)[0], var.owner_id, split("/", var.repository)[1], var.repository_id
+  )
+  subjects = concat(["${local.prefix}:ref:refs/heads/${var.branch}"],
+  var.environment == null ? [] : ["${local.prefix}:environment:${var.environment}"])
 }
 
 resource "aws_iam_openid_connect_provider" "github" {

@@ -83,6 +83,16 @@ variable "github_branch" {
     error_message = "Use a literal protected branch name."
   }
 }
+variable "github_owner_id" {
+  description = "Numeric owner ID (gh api repos/OWNER/REPO --jq .owner.id). Set with github_repository_id when the repository uses immutable OIDC subjects."
+  type        = number
+  default     = null
+}
+variable "github_repository_id" {
+  description = "Numeric repository ID (gh api repos/OWNER/REPO --jq .id)."
+  type        = number
+  default     = null
+}
 variable "github_environment" {
   description = "Protected GitHub environment that gates the push pipeline; its reviewers approve each load test."
   type        = string
