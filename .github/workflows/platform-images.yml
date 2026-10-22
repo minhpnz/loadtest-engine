@@ -1,0 +1,49 @@
+name: Build platform images
+
+# Administrator bootstrap: builds the guard/reaper engine and the EKS runner image on a GitHub-hosted
+# runner (the EKS runner cannot build its own image). Same build-once-per-source-tree rule as the
+# service image; packages created here are owned by this repository's workflows.
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: engine
+            context: .
+            dockerfile: infra/Dockerfile
+            key: infra
+          - name: runner
+            context: infra/runner
+            dockerfile: infra/runner/Dockerfile
+            key: infra/runner
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Log in to GitHub Container Registry with the workflow token
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+      - name: Build or reuse the image for this source tree
+        env:
+          NAME: ${{ matrix.name }}
+          CONTEXT: ${{ matrix.context }}
+          DOCKERFILE: ${{ matrix.dockerfile }}
+          KEY: ${{ matrix.key }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          export REGISTRY="ghcr.io/${OWNER,,}"
+          image="$(infra/scripts/publish_image.sh "$NAME" "$CONTEXT" "$DOCKERFILE" "$KEY")"
+          echo "${NAME^^}_IMAGE=\`$image\`" >> "$GITHUB_STEP_SUMMARY"
