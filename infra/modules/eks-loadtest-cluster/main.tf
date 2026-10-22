@@ -27,7 +27,8 @@ module "eks" {
     eks-pod-identity-agent = { before_compute = true }
   }
 
-  access_entries = var.ci_role_arn == null ? {} : {
+  # Static key: the role ARN is only known after apply, so it must not decide the map keys.
+  access_entries = {
     ci = {
       principal_arn     = var.ci_role_arn
       kubernetes_groups = [var.ci_kubernetes_group]

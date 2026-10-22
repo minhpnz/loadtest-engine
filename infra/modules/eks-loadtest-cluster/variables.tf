@@ -67,7 +67,6 @@ variable "loadtest_max_nodes" {
 variable "ci_role_arn" {
   description = "CI IAM role given a cluster access entry. Mapped to a Kubernetes group only; no AWS-managed access policy."
   type        = string
-  default     = null
 }
 
 variable "ci_kubernetes_group" {

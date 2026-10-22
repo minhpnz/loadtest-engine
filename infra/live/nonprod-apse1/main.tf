@@ -52,7 +52,8 @@ module "cluster" {
   loadtest_instance_types      = var.loadtest_instance_types
   loadtest_max_nodes           = var.loadtest_nodes
   loadtest_desired_nodes       = var.loadtest_nodes
-  depends_on                   = [terraform_data.validate_inputs]
+  # No module-level depends_on: it defers every data source inside the module to apply time
+  # and breaks count/for_each. The preconditions above still fail the plan on bad inputs.
 }
 
 module "results" {
