@@ -1,0 +1,8 @@
+diff --git a/developer/examples/payment-service/src/server.py b/developer/examples/payment-service/src/server.py
+--- a/developer/examples/payment-service/src/server.py
++++ b/developer/examples/payment-service/src/server.py
+@@ -9,3 +9,3 @@
+ # The regression patch changes only this constant from 1 to 32.
+-REQUEST_MEMORY_MIB = 1
++REQUEST_MEMORY_MIB = 32
+ WORKSPACE = local()

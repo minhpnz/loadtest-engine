@@ -1,0 +1,10 @@
+region                       = "ap-southeast-1"
+vpc_id                       = "vpc-REPLACE"
+subnet_ids                   = ["subnet-REPLACE-A", "subnet-REPLACE-B"]
+subnet_type                  = "public"
+endpoint_public_access_cidrs = ["203.0.113.10/32"] # Replace with your current public IPv4.
+github_repository            = "your-company/loadtest-engine"
+github_branch                = "main"
+results_bucket               = "your-company-loadtest-results-unique"
+budget_emails                = []
+test_secret_arns             = []

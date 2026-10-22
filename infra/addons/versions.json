@@ -1,0 +1,5 @@
+{
+  "istio": "1.31.2",
+  "prometheus_stack": "92.11.0",
+  "external_secrets": "2.13.0"
+}

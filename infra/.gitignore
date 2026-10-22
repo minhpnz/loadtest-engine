@@ -1,0 +1,8 @@
+**/.terraform/
+*.tfstate
+*.tfstate.*
+# Keep the dependency lock at the environment root, not in reusable modules.
+modules/**/.terraform.lock.hcl
+# Environment inputs (including the administrator IP) stay local.
+*.tfvars
+!*.tfvars.example

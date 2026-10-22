@@ -1,0 +1,16 @@
+# Platform-owned catalog. Replace repository/project/image values before a cloud run.
+services:
+  payment-service:
+    team: payments-team
+    owner_ids: ["12345"]
+    repository: https://github.com/your-company/payment-service.git
+    image_repository: 123456789012.dkr.ecr.ap-southeast-1.amazonaws.com/payment-service
+    local_path: developer/examples/payment-service
+    local_image: loadtest/payment-service:local
+    profile: small
+    port: 8080
+    health_path: /health
+    config_path: load-tests/load-test-config.yaml
+    allowed_endpoints: [/checkout]
+    # Test-only AWS Secrets Manager ARNs, configured by the platform, never by the scenario.
+    secrets: []
