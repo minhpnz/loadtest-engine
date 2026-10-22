@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
 # The regression patch changes only this constant from 1 to 32.
-REQUEST_MEMORY_MIB = 32
+REQUEST_MEMORY_MIB = 1
 WORKSPACE = local()
 
 
