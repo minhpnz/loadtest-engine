@@ -1,0 +1,84 @@
+name: Run load test
+description: Verify the request, run smoke and load stages on EKS, publish reports and clean up.
+
+inputs:
+  service:
+    description: Registered service
+    required: true
+  service_ref:
+    description: Full 40-character commit SHA whose load-test configuration is used
+    required: true
+  service_image:
+    description: Service image pinned by sha256 digest
+    required: true
+  github_token:
+    description: Workflow token used to verify the run, actor and approvals
+    required: true
+  service_repository_token:
+    description: Read token for a separate private service repository
+    required: false
+    default: ''
+  preflight_token:
+    description: Shared token for the in-cluster guard
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install Python dependencies and run tests
+      shell: bash
+      run: |
+        python3 -m venv .venv
+        .venv/bin/python -m pip install -r infra/requirements.txt
+        make test
+    - name: Read protected platform settings
+      id: platform
+      shell: bash
+      run: |
+        .venv/bin/python - <<'PY'
+        import os
+        from infra.engine.core import ROOT, read_yaml
+        settings = read_yaml(ROOT / 'infra/platform.yaml')
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+            for key in ('aws_role_arn', 'aws_region', 'cluster_name'):
+                value = settings[key]
+                if not isinstance(value, str) or '\n' in value or '\r' in value:
+                    raise ValueError('invalid platform setting')
+                print(f'{key}={value}', file=output)
+        PY
+    - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+      with:
+        role-to-assume: ${{ steps.platform.outputs.aws_role_arn }}
+        aws-region: ${{ steps.platform.outputs.aws_region }}
+        role-duration-seconds: 7200
+        unset-current-credentials: true
+    - name: Run smoke and load stages, publish results, and clean up
+      shell: bash
+      env:
+        AWS_EC2_METADATA_DISABLED: 'true'
+        PYTHONDONTWRITEBYTECODE: '1'
+        SERVICE: ${{ inputs.service }}
+        SERVICE_REF: ${{ inputs.service_ref }}
+        SERVICE_IMAGE: ${{ inputs.service_image }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        SERVICE_REPOSITORY_TOKEN: ${{ inputs.service_repository_token }}
+        PREFLIGHT_TOKEN: ${{ inputs.preflight_token }}
+        EKS_CLUSTER_NAME: ${{ steps.platform.outputs.cluster_name }}
+        KUBECONFIG: ${{ runner.temp }}/loadtest-kubeconfig
+      run: |
+        aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --alias loadtest-eks
+        .venv/bin/python -m infra.engine run --context loadtest-eks
+    - name: Display report
+      if: always()
+      shell: bash
+      run: |
+        if [ -f artifacts/summary.md ]; then
+          cat artifacts/summary.md >> "$GITHUB_STEP_SUMMARY"
+        fi
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: always()
+      with:
+        name: loadtest-${{ github.run_id }}-${{ github.run_attempt }}
+        path: artifacts/
+        if-no-files-found: ignore
+        retention-days: 7

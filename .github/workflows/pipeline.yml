@@ -1,0 +1,47 @@
+name: Service pipeline
+
+# Scenario 1: a push builds the image automatically, then waits at the protected `loadtest`
+# environment. The load test starts only after a required reviewer approves it.
+on:
+  push:
+    branches: [main]
+    paths:
+      - developer/examples/payment-service/**
+
+permissions: {}
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-image.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      service: payment-service
+      ref: ${{ github.sha }}
+
+  loadtest:
+    needs: build
+    # Manual gate: GitHub pauses here until a reviewer of the environment approves.
+    environment: loadtest
+    runs-on: [self-hosted, linux, x64, loadtest-eks]
+    timeout-minutes: 65
+    concurrency:
+      group: loadtest-sandbox
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/run-loadtest
+        with:
+          service: payment-service
+          service_ref: ${{ github.sha }}
+          service_image: ${{ needs.build.outputs.image }}
+          github_token: ${{ github.token }}
+          service_repository_token: ${{ secrets.SERVICE_REPOSITORY_TOKEN }}
+          preflight_token: ${{ secrets.PREFLIGHT_TOKEN }}

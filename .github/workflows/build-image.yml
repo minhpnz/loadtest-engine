@@ -1,0 +1,65 @@
+name: Build service image
+
+# Shared by both entry points. Builds once per source tree: a commit that leaves the service
+# directory unchanged reuses the existing image, so the tested digest is the one that ships.
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: Registered service
+        required: true
+        type: string
+      ref:
+        description: Full commit SHA to build
+        required: true
+        type: string
+    outputs:
+      image:
+        description: Service image pinned by sha256 digest
+        value: ${{ jobs.build.outputs.image }}
+
+permissions: {}
+
+jobs:
+  build:
+    # GitHub-hosted amd64 runner: no access to the EKS runner, no AWS credentials.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Log in to GitHub Container Registry with the workflow token
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+      - name: Build or reuse the image for this source tree
+        id: publish
+        env:
+          SERVICE: ${{ inputs.service }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          python3 -m pip install --quiet --user -r infra/requirements.txt
+          path="$(python3 - <<'PY'
+          import os, re, yaml
+          services = yaml.safe_load(open('infra/services.yaml'))['services']
+          name = os.environ['SERVICE']
+          if name not in services:
+              raise SystemExit('service is not registered')
+          path = services[name]['local_path']
+          if not re.fullmatch(r'[A-Za-z0-9_./-]+', path) or '..' in path.split('/'):
+              raise SystemExit('invalid service path')
+          print(path)
+          PY
+          )"
+          export REGISTRY="ghcr.io/${OWNER,,}"
+          image="$(infra/scripts/publish_image.sh "$SERVICE" "$path" "$path/Dockerfile" "$path")"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "Service image: \`$image\`" >> "$GITHUB_STEP_SUMMARY"
