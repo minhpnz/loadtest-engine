@@ -15,6 +15,11 @@ from pathlib import Path
 
 from .core import ROOT, PREFIX, Rejected, bounded_path, environment, job, limits, read_yaml, validate, validate_target
 
+# Approved entry points and the only event each may be started by.
+# loadtest.yml: someone presses Run workflow. pipeline.yml: a push, gated by an environment approval.
+WORKFLOWS = {'.github/workflows/loadtest.yml': 'workflow_dispatch', '.github/workflows/pipeline.yml': 'push'}
+APPROVAL_ENVIRONMENT = 'loadtest'
+
 
 def command(args, **kwargs):
     return subprocess.run(args, check=True, capture_output=True, text=True, timeout=kwargs.pop('timeout', 60), **kwargs).stdout
@@ -39,18 +44,28 @@ def actor(local, settings):
     if not run_id.isdecimal() or not attempt.isdecimal():
         raise Rejected('GitHub workflow run ID and attempt are required')
     repository = settings['github_repository']
-    data = request_json(f'https://api.github.com/repos/{repository}/actions/runs/{run_id}/attempts/{attempt}',
-                        {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json'})
+    headers = {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json'}
+    runs = f'https://api.github.com/repos/{repository}/actions/runs/{run_id}'
+    data = request_json(f'{runs}/attempts/{attempt}', headers)
     # Verify server-side run metadata, including the person who requested this attempt.
     workflow = data.get('path', '').split('@', 1)[0]
     if (data.get('repository', {}).get('full_name', '').lower() != repository.lower()
-            or data.get('event') != 'workflow_dispatch'
+            or workflow not in WORKFLOWS or data.get('event') != WORKFLOWS[workflow]
             or data.get('head_branch') != settings['github_branch']
             or data.get('head_sha') != os.environ.get('GITHUB_SHA')
-            or data.get('run_attempt') != int(attempt)
-            or workflow != '.github/workflows/loadtest.yml'):
+            or data.get('run_attempt') != int(attempt)):
         raise Rejected('execution must use the approved platform workflow/repository/branch')
-    who = data.get('triggering_actor', {}).get('id')
+    if data['event'] == 'push':
+        # A push only proposes the run; the reviewer who approved the protected environment is
+        # the person authorised against the catalog.
+        approvers = {a.get('user', {}).get('id') for a in request_json(f'{runs}/approvals', headers)
+                     if a.get('state') == 'approved'
+                     and any(e.get('name') == APPROVAL_ENVIRONMENT for e in a.get('environments', []))}
+        if len(approvers) != 1:
+            raise Rejected(f'the {APPROVAL_ENVIRONMENT} environment needs exactly one approving reviewer for this run')
+        who = approvers.pop()
+    else:
+        who = data.get('triggering_actor', {}).get('id')
     if not isinstance(who, int) or who <= 0:
         raise Rejected('GitHub did not return a verified triggering actor')
     return str(who)

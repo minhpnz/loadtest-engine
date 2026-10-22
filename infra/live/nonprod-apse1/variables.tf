@@ -83,6 +83,11 @@ variable "github_branch" {
     error_message = "Use a literal protected branch name."
   }
 }
+variable "github_environment" {
+  description = "Protected GitHub environment that gates the push pipeline; its reviewers approve each load test."
+  type        = string
+  default     = "loadtest"
+}
 variable "results_bucket" {
   type = string
 }

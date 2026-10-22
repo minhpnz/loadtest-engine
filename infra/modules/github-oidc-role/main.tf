@@ -9,6 +9,11 @@ variable "repository" { type = string }
 variable "branch" { type = string }
 variable "cluster_arn" { type = string }
 variable "results_bucket_arn" { type = string }
+variable "environment" {
+  description = "GitHub environment whose jobs may also assume the role (approval-gated pipeline). Null trusts the branch only."
+  type        = string
+  default     = null
+}
 variable "existing_oidc_provider_arn" {
   type    = string
   default = null
@@ -16,6 +21,9 @@ variable "existing_oidc_provider_arn" {
 
 locals {
   issuer = "token.actions.githubusercontent.com"
+  # A job bound to an environment receives an environment subject instead of the branch subject.
+  subjects = concat(["repo:${var.repository}:ref:refs/heads/${var.branch}"],
+  var.environment == null ? [] : ["repo:${var.repository}:environment:${var.environment}"])
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
@@ -35,14 +43,14 @@ resource "aws_iam_role" "executor" {
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = { StringEquals = {
         "${local.issuer}:aud" = "sts.amazonaws.com"
-        "${local.issuer}:sub" = "repo:${var.repository}:ref:refs/heads/${var.branch}"
+        "${local.issuer}:sub" = local.subjects
       } }
     }]
   })
   lifecycle {
     precondition {
-      condition     = can(regex("^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$", var.repository)) && can(regex("^[a-zA-Z0-9_./-]+$", var.branch))
-      error_message = "Repository and branch must be literal identifiers without wildcards."
+      condition     = can(regex("^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$", var.repository)) && can(regex("^[a-zA-Z0-9_./-]+$", var.branch)) && (var.environment == null || can(regex("^[a-zA-Z0-9_.-]+$", var.environment)))
+      error_message = "Repository, branch and environment must be literal identifiers without wildcards."
     }
   }
 }

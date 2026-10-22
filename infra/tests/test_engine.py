@@ -189,6 +189,30 @@ class GitHubIdentityTests(unittest.TestCase):
                 with self.assertRaises(Rejected):
                     actor(False, self.settings)
 
+    def test_push_pipeline_uses_environment_approver_not_pusher(self):
+        run = {**self.run, 'event': 'push', 'path': '.github/workflows/pipeline.yml@main'}
+        approvals = [{'state': 'approved', 'environments': [{'name': 'loadtest'}], 'user': {'id': 300}}]
+        with patch('infra.engine.runtime.request_json', side_effect=[run, approvals]) as request:
+            self.assertEqual(actor(False, self.settings), '300')
+        self.assertEqual(request.call_args.args[0], 'https://api.github.com/repos/acme/platform/actions/runs/42/approvals')
+
+    def test_push_pipeline_without_single_approval_is_denied(self):
+        run = {**self.run, 'event': 'push', 'path': '.github/workflows/pipeline.yml@main'}
+        approved = {'state': 'approved', 'environments': [{'name': 'loadtest'}], 'user': {'id': 300}}
+        for approvals in ([], [{**approved, 'state': 'rejected'}], [{**approved, 'environments': [{'name': 'other'}]}],
+                          [approved, {**approved, 'user': {'id': 301}}]):
+            with self.subTest(approvals=approvals), patch('infra.engine.runtime.request_json', side_effect=[run, approvals]):
+                with self.assertRaises(Rejected):
+                    actor(False, self.settings)
+
+    def test_event_must_match_its_workflow(self):
+        for event, path in [('push', '.github/workflows/loadtest.yml@main'),
+                            ('workflow_dispatch', '.github/workflows/pipeline.yml@main')]:
+            with self.subTest(event=event), patch('infra.engine.runtime.request_json',
+                                                  return_value={**self.run, 'event': event, 'path': path}):
+                with self.assertRaises(Rejected):
+                    actor(False, self.settings)
+
     def test_missing_credentials_or_run_identity_is_denied_before_api_request(self):
         for key in ('GITHUB_TOKEN', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT'):
             with self.subTest(key=key), patch.dict('os.environ', {key: ''}), patch('infra.engine.runtime.request_json') as request:
