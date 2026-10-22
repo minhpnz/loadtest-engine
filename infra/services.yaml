@@ -5,7 +5,7 @@ services:
     owner_ids: ["51442765"]  # numeric GitHub user IDs (gh api user --jq .id)
     repository: https://github.com/minhpnz/loadtest-engine.git
     repository_path: developer/examples/payment-service  # service subdirectory inside the repository
-    image_repository: ghcr.io/minhpnz/loadtest-demo/service
+    image_repository: ghcr.io/minhpnz/loadtest-demo/payment-service  # <registry>/loadtest-demo/<service name>, built by build-image.yml
     local_path: developer/examples/payment-service
     local_image: loadtest/payment-service:local
     profile: small
