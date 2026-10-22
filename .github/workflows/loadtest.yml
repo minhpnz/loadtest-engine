@@ -1,6 +1,6 @@
 name: Load test
 
-# Scenario 2: someone presses Run workflow and picks a commit. The image is looked up by the
+# Scenario 1: someone presses Run workflow and picks a commit. The image is looked up by the
 # commit's source tree (built only if missing), so nobody types a digest.
 on:
   workflow_dispatch:

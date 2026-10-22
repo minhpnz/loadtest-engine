@@ -1,6 +1,6 @@
 name: Service pipeline
 
-# Scenario 1: a push builds the image automatically, then waits at the protected `loadtest`
+# Scenario 2: a push builds the image automatically, then waits at the protected `loadtest`
 # environment. The load test starts only after a required reviewer approves it.
 on:
   push:
