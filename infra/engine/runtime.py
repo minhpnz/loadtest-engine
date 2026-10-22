@@ -384,8 +384,13 @@ class Executor:
             if self.locked:
                 try:
                     self.collect_target_status()
-                    if self.report['verdict'] == 'PASS' and any(pod['oom_killed'] for pod in self.report.get('target_pods', [])):
-                        self.report.update({'verdict': 'FAIL', 'reason': 'target container OOMKilled'})
+                    # An OOMKilled target is a verdict on the service, not on the measurement: it wins
+                    # over a safety abort (whose CPU telemetry goes stale once the container dies).
+                    if (self.report['verdict'] in ('PASS', 'ABORTED', 'INVALID')
+                            and any(pod['oom_killed'] for pod in self.report.get('target_pods', []))):
+                        stopped = self.report.get('reason') if self.report['verdict'] != 'PASS' else None
+                        self.report.update({'verdict': 'FAIL', 'reason': 'target container OOMKilled'
+                                            + (f' (stage stopped: {stopped})' if stopped else '')})
                 except Exception:
                     self.report['target_status_collection'] = 'UNAVAILABLE'
                 try:

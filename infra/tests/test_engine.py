@@ -251,13 +251,14 @@ class GitHubIdentityTests(unittest.TestCase):
 
 
 class FakeKube:
-    def __init__(self, failed=False, cleanup_failure=False, interrupt=False, measured_ms=30000, missing_html=False, oom=False):
+    def __init__(self, failed=False, cleanup_failure=False, interrupt=False, measured_ms=30000, missing_html=False, oom=False, abort=None):
         self.objects = {}
         self.calls = []
         self.failed, self.cleanup_failure, self.interrupt = failed, cleanup_failure, interrupt
         self.measured_ms = measured_ms
         self.missing_html = missing_html
         self.oom = oom
+        self.abort = abort
         self.objects[('configmap', 'loadtest-system', 'limits')] = {'data': {'sha256': hashlib.sha256(json.dumps(limits(), sort_keys=True).encode()).hexdigest()}}
 
     def call(self, *args, **kwargs):
@@ -287,6 +288,8 @@ class FakeKube:
         for value in values:
             if value['kind'] == 'Job':
                 value['status'] = {'conditions': [{'type': 'Complete', 'status': 'True'}]}
+            if value['kind'] == 'Namespace' and self.abort:
+                value['metadata']['annotations'] = {PREFIX + 'abort-reason': self.abort}
             self.objects[(value['kind'].lower(), value['metadata'].get('namespace'), value['metadata']['name'])] = value
 
     def get(self, resource, name=None, namespace=None, labels=None):
@@ -335,6 +338,15 @@ class LifecycleTests(unittest.TestCase):
         self.assertTrue(report['target_pods'][0]['oom_killed'])
         self.assertEqual(report['target_pods'][0]['last_termination']['exitCode'], 137)
         self.assertIsNone(kube.get('configmap', 'execution-slot', 'loadtest-system'))
+
+    def test_target_oom_turns_safety_abort_into_fail(self):
+        code, report, _ = self.execute(FakeKube(oom=True, abort='missing or stale safety telemetry'))
+        self.assertEqual((code, report['verdict'], report['cleanup']), (1, 'FAIL', 'COMPLETE'))
+        self.assertEqual(report['reason'], 'target container OOMKilled (stage stopped: missing or stale safety telemetry)')
+
+    def test_safety_abort_without_oom_stays_aborted(self):
+        code, report, _ = self.execute(FakeKube(abort='cpu exceeded safety threshold for 30 seconds'))
+        self.assertEqual((code, report['verdict']), (1, 'ABORTED'))
 
     def test_missing_html_fails_run_and_still_cleans_up(self):
         code, report, _ = self.execute(FakeKube(missing_html=True))
